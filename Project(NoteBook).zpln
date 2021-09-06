@@ -1,0 +1,1125 @@
+﻿{
+  "paragraphs": [
+    {
+      "title": "Loading Data",
+      "text": "%pyspark\n\n#imports\nfrom pyspark.sql.types import *\nfrom pyspark.sql.functions import *\nimport datetime\nfrom pyspark.sql import functions as F\nimport pandas as pd\n\n#Read Data from CSV and Load it to a DataFrame\ndf = spark.read.csv(\"/data/Master.csv\").toDF(\"ID\", \"Date\", \"Customer_Mobile\", \"Status\", \"Amount\",\"Merchant_Name\", \"Facility_Acc_No\") #Fintech Transation Data\ndf_Elec_Data = spark.read.csv(\"/data/Master_Elec.csv\").toDF(\"Bill_Val\", \"Unit_Consumption\", \"Solar_Cap\", \"Monthly_Production\", \"Investment\", \"Installment\", \"Init_Payment\") #Elec Related data found from research\n",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:57:19+0000",
+      "progress": 100,
+      "config": {
+        "tableHide": false,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=48",
+              "$$hashKey": "object:12158"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=49",
+              "$$hashKey": "object:12159"
+            }
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680530_1473143796",
+      "id": "paragraph_1609103176452_732266771",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T07:42:03+0000",
+      "dateFinished": "2021-09-05T07:42:07+0000",
+      "status": "FINISHED",
+      "focus": true,
+      "$$hashKey": "object:11881"
+    },
+    {
+      "title": "Data Preparation",
+      "text": "%pyspark\n\n#Dropping Unwanted Columns\ndf = df.drop('Status', 'ID')\n\n#Cast Data Types as Needed\ndf = df.withColumn(\"Amount\",col(\"Amount\").cast(\"int\"))\n\n#To mitigate legal issues are to have a significant data set introduced \"Telco\" and respectivlty \"Elec\" terms for Merchant names of Telco Companies and Electricity Service Provides. Also, changed the \"Merchant_Name\" column name to \"Payment_Type\"\ndf = df.withColumn('Merchant_Name', regexp_replace('Merchant_Name', 'Etisalat', 'Telco'))\ndf = df.withColumn('Merchant_Name', regexp_replace('Merchant_Name', 'Dialog', 'Telco'))\ndf = df.withColumn('Merchant_Name', regexp_replace('Merchant_Name', 'Airtel', 'Telco'))\ndf = df.withColumn('Merchant_Name', regexp_replace('Merchant_Name', 'Mobitel', 'Telco'))\ndf = df.withColumn('Merchant_Name', regexp_replace('Merchant_Name', 'Hutch', 'Telco'))\ndf = df.withColumn('Merchant_Name', regexp_replace('Merchant_Name', 'Ceylon Electricity Board', 'Electricity'))\ndf = df.withColumn('Merchant_Name', regexp_replace('Merchant_Name', 'Lanka Electricity Co.', 'Electricity')).toDF (\"Date\", \"Customer_Mobile\", \"Amount\",\"Payment_Type\", \"Facility_Acc_No\")\n\n#Drop Facility_Acc_No for ease of future steps\ndf = df.drop('Facility_Acc_No')\n\n#Extract the month and year from the Date Column for ease of future steps ans further expand the dataframe\ndf = df.select(year(\"Date\"), month(\"Date\"), (\"Customer_Mobile\"), (\"Amount\"),(\"Payment_Type\")).toDF(\"Year\", \"Month\", \"Customer_Mobile\", \"Amount\",\"Payment_Type\")",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:42:07+0000",
+      "progress": 0,
+      "config": {
+        "tableHide": false,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680531_1275057284",
+      "id": "paragraph_1629881627758_875423364",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T07:42:07+0000",
+      "dateFinished": "2021-09-05T07:42:09+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11882"
+    },
+    {
+      "title": "Year 2019 Data Analysis",
+      "text": "%pyspark\n\n#Take only data with the year value of 2019 and create dataframes to each month, then take the total Elec. bill value and Telco bill value each Customer has done in each month. Finally get all 2019 data into a one join dataframe\ndf19 = df.where(df.Year == 2019)\ndf19_1 = df19.where(df19.Month == 1)\ndf19_2 = df19.where(df19.Month == 2)\ndf19_3 = df19.where(df19.Month == 3)\ndf19_4 = df19.where(df19.Month == 4)\ndf19_5 = df19.where(df19.Month == 5)\ndf19_6 = df19.where(df19.Month == 6)\ndf19_7 = df19.where(df19.Month == 7)\ndf19_8 = df19.where(df19.Month == 8)\ndf19_9 = df19.where(df19.Month == 9)\ndf19_10 = df19.where(df19.Month == 10)\ndf19_11 = df19.where(df19.Month == 11)\ndf19_12 = df19.where(df19.Month == 12)\n\ndf19_1 = df19_1.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_1\",\"Telco19_1\")\ndf19_2 = df19_2.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_2\",\"Telco19_2\")\ndf19_3 = df19_3.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_3\",\"Telco19_3\")\ndf19_4 = df19_4.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_4\",\"Telco19_4\")\ndf19_5 = df19_5.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_5\",\"Telco19_5\")\ndf19_6 = df19_6.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_6\",\"Telco19_6\")\ndf19_7 = df19_7.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_7\",\"Telco19_7\")\ndf19_8 = df19_8.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_8\",\"Telco19_8\")\ndf19_9 = df19_9.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_9\",\"Telco19_9\")\ndf19_10 = df19_10.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_10\",\"Telco19_10\")\ndf19_11 = df19_11.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_11\",\"Telco19_11\")\ndf19_12 = df19_12.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec19_12\",\"Telco19_12\")\n\n#Join all the dataframes to one annual data frame\ndf19 = df19_1.join(df19_2, \"Customer\", how ='full').join(df19_3, \"Customer\", how ='full').join(df19_4, \"Customer\", how='full').join(df19_5, \"Customer\", how='full').join(df19_6, \"Customer\", how='full').join(df19_7, \"Customer\", how ='full').join(df19_8, \"Customer\", how ='full').join(df19_9, \"Customer\", how='full').join(df19_10, \"Customer\", how='full').join(df19_11, \"Customer\", how='full').join(df19_12, \"Customer\", how='full').toDF(\"Customer\",\"Elec19_1\",\"Telco19_1\",\"Elec19_2\",\"Telco19_2\",\"Elec19_3\",\"Telco19_3\",\"Elec19_4\",\"Telco19_4\",\"Elec19_5\",\"Telco19_5\",\"Elec19_6\",\"Telco19_6\",\"Elec19_7\",\"Telco19_7\",\"Elec19_8\",\"Telco19_8\",\"Elec19_9\",\"Telco19_9\",\"Elec19_10\",\"Telco19_10\",\"Elec19_11\",\"Telco19_11\",\"Elec19_12\",\"Telco19_12\")\n\ndf19 = df19.na.fill(0) #Replace \"Null\" value with 0\n\n#Getting Total Electrical Paid Value by each Customer for 2019 and Remove 0 valued users\ndf19Tot_Elec = df19.groupBy(\"Customer\").agg(F.sum(df19.Elec19_1+df19.Elec19_2+df19.Elec19_3+df19.Elec19_4+df19.Elec19_5+df19.Elec19_6+df19.Elec19_7+df19.Elec19_8+df19.Elec19_9+df19.Elec19_10+df19.Elec19_11+df19.Elec19_12)).toDF(\"Customer\", \"Tot_Elec19\")\ndf19Tot_Elec = df19Tot_Elec.where(df19Tot_Elec.Tot_Elec19 > 0)\ndf19Tot_Elec = df19Tot_Elec.select(df19Tot_Elec['Customer'], df19Tot_Elec['Tot_Elec19'], df19Tot_Elec['Tot_Elec19'] / 2.44).toDF(\"Customer\",\"Total_Paid_Elec_19\",\"Monthly_Avg_Elec_19\") #Get Customer, Total Each Customer Paid in the year, Avg. Monthly Pay without zeor payment customer\n\n#Getting Total Telco Paid Value by each Customer for 2019 and Remove 0 valued users\ndf19Tot_Telco = df19.groupBy(\"Customer\").agg(F.sum(df19.Telco19_1+df19.Telco19_2+df19.Telco19_3+df19.Telco19_4+df19.Telco19_5+df19.Telco19_6+df19.Telco19_7+df19.Telco19_8+df19.Telco19_9+df19.Telco19_10+df19.Telco19_11+df19.Telco19_12)).toDF(\"Customer\", \"Tot_Telco19\")\ndf19Tot_Telco = df19Tot_Telco.where(df19Tot_Telco.Tot_Telco19 > 0)\ndf19Tot_Telco = df19Tot_Telco.select(df19Tot_Telco['Customer'], df19Tot_Telco['Tot_Telco19'], df19Tot_Telco['Tot_Telco19'] / 3.07).toDF(\"Customer\",\"Total_Paid_Telco_19\",\"Monthly_Avg_Telco_19\") #Get Customer, Total Each Customer Paid in the year, Avg. Monthly Pay without zeor payment customer",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:42:09+0000",
+      "progress": 100,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=50",
+              "$$hashKey": "object:12182"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=51",
+              "$$hashKey": "object:12183"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=52",
+              "$$hashKey": "object:12184"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=53",
+              "$$hashKey": "object:12185"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=54",
+              "$$hashKey": "object:12186"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=55",
+              "$$hashKey": "object:12187"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=56",
+              "$$hashKey": "object:12188"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=57",
+              "$$hashKey": "object:12189"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=58",
+              "$$hashKey": "object:12190"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=59",
+              "$$hashKey": "object:12191"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=60",
+              "$$hashKey": "object:12192"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=61",
+              "$$hashKey": "object:12193"
+            }
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680531_56392972",
+      "id": "paragraph_1629837537340_329055972",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T07:42:09+0000",
+      "dateFinished": "2021-09-05T07:43:17+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11883"
+    },
+    {
+      "title": "Exporting Results of 2019",
+      "text": "%pyspark\n\n#Exporting All Elec / Telco Data throughout of the Year to a CSV\ndf19Elec = df19.select(\"Customer\", \"Elec19_1\", \"Elec19_2\", \"Elec19_3\", \"Elec19_4\", \"Elec19_5\", \"Elec19_6\", \"Elec19_7\", \"Elec19_8\", \"Elec19_9\", \"Elec19_10\", \"Elec19_11\", \"Elec19_12\")\ndf19Elec.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/All_Data/Elec/Elec19\") #Write the data as a single CSV than in parts\n\ndf19Telco = df19.select(\"Customer\", \"Telco19_1\", \"Telco19_2\", \"Telco19_3\", \"Telco19_4\", \"Telco19_5\", \"Telco19_6\", \"Telco19_7\", \"Telco19_8\", \"Telco19_9\", \"Telco19_10\", \"Telco19_11\", \"Telco19_12\")\ndf19Telco.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/All_Data/Telco/Telco19\")\n\n#Exporting Summary Elec / Telco Data for the Year to a CSV\ndf19Tot_Elec.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Summary_Data/Elec/Elec19\")\ndf19Tot_Telco.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Summary_Data/Telco/Telco19\")",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:43:18+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": false
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680532_1837820166",
+      "id": "paragraph_1630005674844_1508459734",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11884"
+    },
+    {
+      "title": "Year 2020 Data Analysis",
+      "text": "%pyspark\n\n#Take only data with the year value of 2020 and create dataframes to each month, then take the total Elec. bill value and Telco bill value each Customer has done in each month. Finally get all 2019 data into a one join dataframe\ndf20 = df.where(df.Year == 2020)\ndf20_1 = df20.where(df20.Month == 1)\ndf20_2 = df20.where(df20.Month == 2)\ndf20_3 = df20.where(df20.Month == 3)\ndf20_4 = df20.where(df20.Month == 4)\ndf20_5 = df20.where(df20.Month == 5)\ndf20_6 = df20.where(df20.Month == 6)\ndf20_7 = df20.where(df20.Month == 7)\ndf20_8 = df20.where(df20.Month == 8)\ndf20_9 = df20.where(df20.Month == 9)\ndf20_10 = df20.where(df20.Month == 10)\ndf20_11 = df20.where(df20.Month == 11)\ndf20_12 = df20.where(df20.Month == 12)\n\ndf20_1 = df20_1.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_1\",\"Telco20_1\")\ndf20_2 = df20_2.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_2\",\"Telco20_2\")\ndf20_3 = df20_3.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_3\",\"Telco20_3\")\ndf20_4 = df20_4.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_4\",\"Telco20_4\")\ndf20_5 = df20_5.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_5\",\"Telco20_5\")\ndf20_6 = df20_6.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_6\",\"Telco20_6\")\ndf20_7 = df20_7.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_7\",\"Telco20_7\")\ndf20_8 = df20_8.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_8\",\"Telco20_8\")\ndf20_9 = df20_9.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_9\",\"Telco20_9\")\ndf20_10 = df20_10.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_10\",\"Telco20_10\")\ndf20_11 = df20_11.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_11\",\"Telco20_11\")\ndf20_12 = df20_12.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec20_12\",\"Telco20_12\")\n\n#Join all the dataframes to one annual data frame\ndf20 = df20_1.join(df20_2, \"Customer\", how ='full').join(df20_3, \"Customer\", how ='full').join(df20_4, \"Customer\", how='full').join(df20_5, \"Customer\", how='full').join(df20_6, \"Customer\", how='full').join(df20_7, \"Customer\", how ='full').join(df20_8, \"Customer\", how ='full').join(df20_9, \"Customer\", how='full').join(df20_10, \"Customer\", how='full').join(df20_11, \"Customer\", how='full').join(df20_12, \"Customer\", how='full').toDF(\"Customer\",\"Elec20_1\",\"Telco20_1\",\"Elec20_2\",\"Telco20_2\",\"Elec20_3\",\"Telco20_3\",\"Elec20_4\",\"Telco20_4\",\"Elec20_5\",\"Telco20_5\",\"Elec20_6\",\"Telco20_6\",\"Elec20_7\",\"Telco20_7\",\"Elec20_8\",\"Telco20_8\",\"Elec20_9\",\"Telco20_9\",\"Elec20_10\",\"Telco20_10\",\"Elec20_11\",\"Telco20_11\",\"Elec20_12\",\"Telco20_12\")\n\ndf20 = df20.na.fill(0) #Replace \"Null\" value with 0\n\n#Getting Total Electrical Paid Value by each Customer for 2020 and Remove 0 valued users\ndf20Tot_Elec = df20.groupBy(\"Customer\").agg(F.sum(df20.Elec20_1+df20.Elec20_2+df20.Elec20_3+df20.Elec20_4+df20.Elec20_5+df20.Elec20_6+df20.Elec20_7+df20.Elec20_8+df20.Elec20_9+df20.Elec20_10+df20.Elec20_11+df20.Elec20_12)).toDF(\"Customer\", \"Tot_Elec20\")\ndf20Tot_Elec = df20Tot_Elec.where(df20Tot_Elec.Tot_Elec20 > 0)\ndf20Tot_Elec = df20Tot_Elec.select(df20Tot_Elec['Customer'], df20Tot_Elec['Tot_Elec20'], df20Tot_Elec['Tot_Elec20'] / 2.83).toDF(\"Customer\",\"Total_Paid_Elec_20\",\"Monthly_Avg_Elec_20\") #Get Customer, Total Each Customer Paid in the year, Avg. Monthly Pay without zeor payment customer\n\n#Getting Total Telco Paid Value by each Customer for 2020 and Remove 0 valued users\ndf20Tot_Telco = df20.groupBy(\"Customer\").agg(F.sum(df20.Telco20_1+df20.Telco20_2+df20.Telco20_3+df20.Telco20_4+df20.Telco20_5+df20.Telco20_6+df20.Telco20_7+df20.Telco20_8+df20.Telco20_9+df20.Telco20_10+df20.Telco20_11+df20.Telco20_12)).toDF(\"Customer\", \"Tot_Telco20\")\ndf20Tot_Telco = df20Tot_Telco.where(df20Tot_Telco.Tot_Telco20 > 0)\ndf20Tot_Telco = df20Tot_Telco.select(df20Tot_Telco['Customer'], df20Tot_Telco['Tot_Telco20'], df20Tot_Telco['Tot_Telco20'] / 5.17).toDF(\"Customer\",\"Total_Paid_Telco_20\",\"Monthly_Avg_Telco_20\") #Get Customer, Total Each Customer Paid in the year, Avg. Monthly Pay without zeor payment customer",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:43:18+0000",
+      "progress": 100,
+      "config": {
+        "lineNumbers": false,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=62",
+              "$$hashKey": "object:12236"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=63",
+              "$$hashKey": "object:12237"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=64",
+              "$$hashKey": "object:12238"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=65",
+              "$$hashKey": "object:12239"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=66",
+              "$$hashKey": "object:12240"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=67",
+              "$$hashKey": "object:12241"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=68",
+              "$$hashKey": "object:12242"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=69",
+              "$$hashKey": "object:12243"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=70",
+              "$$hashKey": "object:12244"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=71",
+              "$$hashKey": "object:12245"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=72",
+              "$$hashKey": "object:12246"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=73",
+              "$$hashKey": "object:12247"
+            }
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680535_637509619",
+      "id": "paragraph_1630022945476_1403464440",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T07:43:18+0000",
+      "dateFinished": "2021-09-05T07:44:26+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11885"
+    },
+    {
+      "title": "Exporting Results of 2020",
+      "text": "%pyspark\n\n#Exporting All Elec / Telco Data throughout of the Year to a CSV\ndf20Elec = df20.select(\"Customer\", \"Elec20_1\", \"Elec20_2\", \"Elec20_3\", \"Elec20_4\", \"Elec20_5\", \"Elec20_6\", \"Elec20_7\", \"Elec20_8\", \"Elec20_9\", \"Elec20_10\", \"Elec20_11\", \"Elec20_12\")\ndf20Elec.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/All_Data/Elec/Elec20\") #Write the data as a single CSV than in parts\n\ndf20Telco = df20.select(\"Customer\", \"Telco20_1\", \"Telco20_2\", \"Telco20_3\", \"Telco20_4\", \"Telco20_5\", \"Telco20_6\", \"Telco20_7\", \"Telco20_8\", \"Telco20_9\", \"Telco20_10\", \"Telco20_11\", \"Telco20_12\")\ndf20Telco.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/All_Data/Telco/Telco20\")\n\n#Exporting Summary Elec / Telco Data for the Year to a CSV\ndf20Tot_Elec.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Summary_Data/Elec/Elec20\")\ndf20Tot_Telco.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Summary_Data/Telco/Telco20\")\n\n\n#df19Elec.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Elec19\")\n#df19Elec.printSchema()",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:44:27+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": false
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680538_1887109999",
+      "id": "paragraph_1630022999942_1628095737",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11886"
+    },
+    {
+      "title": "Year 2021 Data Analysis",
+      "text": "%pyspark\n\n#Take only data with the year value of 2021 and create dataframes to each month, then take the total Elec. bill value and Telco bill value each Customer has done in each month. Finally get all 2021 data into a one join dataframe\ndf21 = df.where(df.Year == 2021)\ndf21_1 = df21.where(df21.Month == 1)\ndf21_2 = df21.where(df21.Month == 2)\ndf21_3 = df21.where(df21.Month == 3)\ndf21_4 = df21.where(df21.Month == 4)\ndf21_5 = df21.where(df21.Month == 5)\ndf21_6 = df21.where(df21.Month == 6)\ndf21_7 = df21.where(df21.Month == 7)\n\ndf21_1 = df21_1.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec21_1\",\"Telco21_1\")\ndf21_2 = df21_2.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec21_2\",\"Telco21_2\")\ndf21_3 = df21_3.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec21_3\",\"Telco21_3\")\ndf21_4 = df21_4.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec21_4\",\"Telco21_4\")\ndf21_5 = df21_5.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec21_5\",\"Telco21_5\")\ndf21_6 = df21_6.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec21_6\",\"Telco21_6\")\ndf21_7 = df21_7.groupBy(\"Customer_Mobile\").pivot(\"Payment_Type\").agg(sum(\"Amount\")).toDF(\"Customer\",\"Elec21_7\",\"Telco21_7\")\n\n#Join all the dataframes to one annual data frame\ndf21 = df21_1.join(df21_2, \"Customer\", how ='full').join(df21_3, \"Customer\", how ='full').join(df21_4, \"Customer\", how='full').join(df21_5, \"Customer\", how='full').join(df21_6, \"Customer\", how='full').join(df21_7, \"Customer\", how ='full').toDF(\"Customer\",\"Elec21_1\",\"Telco21_1\",\"Elec21_2\",\"Telco21_2\",\"Elec21_3\",\"Telco21_3\",\"Elec21_4\",\"Telco21_4\",\"Elec21_5\",\"Telco21_5\",\"Elec21_6\",\"Telco21_6\",\"Elec21_7\",\"Telco21_7\")\n\ndf21 = df21.na.fill(0) #Replace \"Null\" value with 0\n\n#Getting Total Electrical Paid Value by each Customer for 2021 and Remove 0 valued users\ndf21Tot_Elec = df21.groupBy(\"Customer\").agg(F.sum(df21.Elec21_1+df21.Elec21_2+df21.Elec21_3+df21.Elec21_4+df21.Elec21_5+df21.Elec21_6+df21.Elec21_7)).toDF(\"Customer\", \"Tot_Elec21\")\ndf21Tot_Elec = df21Tot_Elec.where(df21Tot_Elec.Tot_Elec21 > 0)\ndf21Tot_Elec = df21Tot_Elec.select(df21Tot_Elec['Customer'], df21Tot_Elec['Tot_Elec21'], df21Tot_Elec['Tot_Elec21'] / 3.1).toDF(\"Customer\",\"Total_Paid_Elec_21\",\"Monthly_Avg_Elec_21\") #Get Customer, Total Each Customer Paid in the year, Avg. Monthly Pay without zeor payment customer\n\n#Getting Total Telco Paid Value by each Customer for 2021 and Remove 0 valued users\ndf21Tot_Telco = df21.groupBy(\"Customer\").agg(F.sum(df21.Telco21_1+df21.Telco21_2+df21.Telco21_3+df21.Telco21_4+df21.Telco21_5+df21.Telco21_6+df21.Telco21_7)).toDF(\"Customer\", \"Tot_Telco21\")\ndf21Tot_Telco = df21Tot_Telco.where(df21Tot_Telco.Tot_Telco21 > 0)\ndf21Tot_Telco = df21Tot_Telco.select(df21Tot_Telco['Customer'], df21Tot_Telco['Tot_Telco21'], df21Tot_Telco['Tot_Telco21'] / 4.58).toDF(\"Customer\",\"Total_Paid_Telco_21\",\"Monthly_Avg_Telco_21\") #Get Customer, Total Each Customer Paid in the year, Avg. Monthly Pay without zeor payment customer",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:44:27+0000",
+      "progress": 100,
+      "config": {
+        "lineNumbers": false,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=74",
+              "$$hashKey": "object:12290"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=75",
+              "$$hashKey": "object:12291"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=76",
+              "$$hashKey": "object:12292"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=77",
+              "$$hashKey": "object:12293"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=78",
+              "$$hashKey": "object:12294"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=79",
+              "$$hashKey": "object:12295"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=80",
+              "$$hashKey": "object:12296"
+            }
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680539_1451421215",
+      "id": "paragraph_1630032233601_608681613",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T07:44:27+0000",
+      "dateFinished": "2021-09-05T07:44:58+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11887"
+    },
+    {
+      "title": "Exporting Results of 2021",
+      "text": "%pyspark\n\n#Exporting All Elec / Telco Data throughout of the Year to a CSV\ndf21Elec = df21.select(\"Customer\", \"Elec21_1\", \"Elec21_2\", \"Elec21_3\", \"Elec21_4\", \"Elec21_5\", \"Elec21_6\", \"Elec21_7\")\ndf21Elec.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/All_Data/Elec/Elec21\") #Write the data as a single CSV than in parts\n\ndf21Telco = df21.select(\"Customer\", \"Telco21_1\", \"Telco21_2\", \"Telco21_3\", \"Telco21_4\", \"Telco21_5\", \"Telco21_6\", \"Telco21_7\")\ndf21Telco.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/All_Data/Telco/Telco21\")\n\n#Exporting Summary Elec / Telco Data for the Year to a CSV\ndf21Tot_Elec.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Summary_Data/Elec/Elec21\")\ndf21Tot_Telco.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Summary_Data/Telco/Telco21\")",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:44:58+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": false
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680540_2127734850",
+      "id": "paragraph_1630032353224_383097406",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11888"
+    },
+    {
+      "title": "Combine All Results - Elec and Telco Separately (2019/20/21)",
+      "text": "%pyspark\n\n#Get each year total paid value and avg into a single DataFrame (Elec) \ndf_Elec_Final = df19Tot_Elec.join(df20Tot_Elec, \"Customer\", how ='full').join(df21Tot_Elec, \"Customer\", how ='full').toDF(\"Customer\",\"Total_Paid_Elec_19\",\"Monthly_Avg_Elec_19\" ,\"Total_Paid_Elec_20\",\"Monthly_Avg_Elec_20\",\"Total_Paid_Elec_21\",\"Monthly_Avg_Elec_21\")\ndf_Elec_Final = df_Elec_Final.na.fill(0) #Replace \"Null\" value with 0\n\n#Dropping Unwanted Columns\ndf_Elec_Final = df_Elec_Final.drop('Monthly_Avg_Elec_19', 'Monthly_Avg_Elec_20', 'Monthly_Avg_Elec_21')\ndf_Elec_Final = df_Elec_Final.select(df_Elec_Final['Customer'], df_Elec_Final['Total_Paid_Elec_19']+df_Elec_Final['Total_Paid_Elec_20']+df_Elec_Final['Total_Paid_Elec_21'], (df_Elec_Final['Total_Paid_Elec_19']+df_Elec_Final['Total_Paid_Elec_20']+df_Elec_Final['Total_Paid_Elec_21']) / 1.55).toDF(\"Customer\",\"Total_Paid_Overall_Elec\",\"Monthly_Avg_Overall_Elec\") #Get Customer, Total Each Customer Paid throughout the duration, Avg. Monthly Pay without each customer had done\ndf_Elec_Final = df_Elec_Final.withColumn(\"Monthly_Avg_Overall_Elec\",round(col(\"Monthly_Avg_Overall_Elec\"), 2)) #Round to 2 decimal places\n\n\n#Get each year total paid value and avg into a single DataFrame (Telco) \ndf_Telco_Final = df19Tot_Telco.join(df20Tot_Telco, \"Customer\", how ='full').join(df21Tot_Telco, \"Customer\", how ='full').toDF(\"Customer\",\"Total_Paid_Telco_19\",\"Monthly_Avg_Telco_19\" ,\"Total_Paid_Telco_20\",\"Monthly_Avg_Telco_20\",\"Total_Paid_Telco_21\",\"Monthly_Avg_Telco_21\")\ndf_Telco_Final = df_Telco_Final.na.fill(0) #Replace \"Null\" value with 0\n\n#Dropping Unwanted Columns\ndf_Telco_Final = df_Telco_Final.drop('Monthly_Avg_Telco_19', 'Monthly_Avg_Telco_20', 'Monthly_Avg_Telco_21')\ndf_Telco_Final = df_Telco_Final.select(df_Telco_Final['Customer'], df_Telco_Final['Total_Paid_Telco_19']+df_Telco_Final['Total_Paid_Telco_20']+df_Telco_Final['Total_Paid_Telco_21'], (df_Telco_Final['Total_Paid_Telco_19']+df_Telco_Final['Total_Paid_Telco_20']+df_Telco_Final['Total_Paid_Telco_21']) / 1.55).toDF(\"Customer\",\"Total_Paid_Overall_Telco\",\"Monthly_Avg_Overall_Telco\") #Get Customer, Total Each Customer Paid throughout the duration, Avg. Monthly Pay without each customer had done\ndf_Telco_Final = df_Telco_Final.withColumn(\"Monthly_Avg_Overall_Telco\",round(col(\"Monthly_Avg_Overall_Telco\"), 2)) #Round to 2 decimal places",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:44:58+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680541_466839024",
+      "id": "paragraph_1630034612045_239278532",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T07:44:58+0000",
+      "dateFinished": "2021-09-05T07:44:59+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11889"
+    },
+    {
+      "title": "Exporting Combine Results - Elec and Telco Separately  (2019/20/21)",
+      "text": "%pyspark\n\n#Exporting entire timeline total sale vs. monthly pamynet avg for elec users and telco users in two csvs'.\ndf_Elec_Final.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Final_Data/Elec\") #Write the data as a single CSV than in parts and overide each time perform\ndf_Telco_Final.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Final_Data/Telco\")",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:44:59+0000",
+      "progress": 0,
+      "config": {
+        "tableHide": false,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": false
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680541_1240541880",
+      "id": "paragraph_1630036344274_1677154979",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11890"
+    },
+    {
+      "title": "Finding Data Related to Electricity users with Bank Loan data, Solar Company Data and Electricity Service Providers Data",
+      "text": "%pyspark\n\ndf_Elec_Data = spark.read.csv(\"/data/Master_Elec.csv\").toDF(\"Bill_Val\", \"Unit_Consumption\", \"Solar_Cap\", \"Monthly_Production\", \"Investment\", \"Installment\", \"Init_Payment\") #Elec Related data found from research\n\n#Drop unwanted Columns\ndf_Elec_Data = df_Elec_Data.drop('Solar_Cap', 'Investment')\n\n\n#Cast Data Types as Needed\ndf_Elec_Data = df_Elec_Data.withColumn(\"Bill_Val\",col(\"Bill_Val\").cast(\"float\"))\ndf_Elec_Data = df_Elec_Data.withColumn(\"Unit_Consumption\",col(\"Unit_Consumption\").cast(\"float\"))\ndf_Elec_Data = df_Elec_Data.withColumn(\"Monthly_Production\",col(\"Monthly_Production\").cast(\"float\"))\ndf_Elec_Data = df_Elec_Data.withColumn(\"Installment\",col(\"Installment\").cast(\"float\"))\ndf_Elec_Data = df_Elec_Data.withColumn(\"Init_Payment\",col(\"Init_Payment\").cast(\"float\"))\n\ndf_Elec_Data = df_Elec_Data.na.fill(0) #Replace \"Null\" value with 0\ndf_Elec_Data.show()\n\ndf_Elec_Data_Avg = df_Elec_Data.select(F.avg('Bill_Val'), F.avg('Unit_Consumption'), F.avg('Monthly_Production'), F.avg('Installment'), F.avg('Init_Payment')).toDF(\"A\",\"B\",\"C\",\"D\",\"E\") #Get Avg bill related data from all the columns\n\ndf_Elec_Data_Factor = df_Elec_Data_Avg.select(df_Elec_Data_Avg['A']/df_Elec_Data_Avg['A'], df_Elec_Data_Avg['B']/df_Elec_Data_Avg['A'], df_Elec_Data_Avg['C']/df_Elec_Data_Avg['A'], df_Elec_Data_Avg['D']/df_Elec_Data_Avg['A'], df_Elec_Data_Avg['E']/df_Elec_Data_Avg['A']).toDF(\"Bill_Val_Factor\",\"Unit_Consumption_Factor\",\"Monthly_Production_Factor\",\"Installment_Factor\",\"Init_Payment_Factor\") #Get Factor value for a unit bill value\n\nprint(\"Factors for Unit Bill Value:\")\ndf_Elec_Data_Factor.show() #Show factor values\n\n#Get the gound level multiplication for Monthly_Avg_Elec values for each user with the unit bill factors\ndf_Elec_Saving = df_Elec_Final.select(df_Elec_Final.Total_Paid_Overall_Elec, df_Elec_Final.Monthly_Avg_Overall_Elec, df_Elec_Final['Monthly_Avg_Overall_Elec']* 0.0255601792573624, df_Elec_Final['Monthly_Avg_Overall_Elec']* 0.0258361075544174, df_Elec_Final['Monthly_Avg_Overall_Elec']* 0.402193405889885, df_Elec_Final['Monthly_Avg_Overall_Elec']* 2.97695262483995).toDF(\"Total_Paid_Overall_Elec\", \"Monthly_Avg_Overall_Elec\", \"A\", \"B\", \"Installment\", \"D\")\n\n#Doing Calculations with unit bill value factors * Monthly_Avg_Elec to find the money each user is saving for first 10 years, second 10 years, total 20 year, kWh contirbution to the grid for first ten years, kWh contribution to the grid for second ten years and total 20 years kWh contirbution to the grid\ndf_Elec_10yr_Saving = df_Elec_Saving.withColumn(\"First_Ten_Year_Saving\", ((((col(\"B\") - col(\"A\")) * 17.78) + (col(\"Monthly_Avg_Overall_Elec\") - col(\"Installment\"))) * 120) - col(\"D\") )\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"Second_Ten_Year_Saving\", (((col(\"B\") - col(\"A\")) * 17.78) + col(\"Monthly_Avg_Overall_Elec\")) * 120 )\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"Total_20_Year_Saving\", col(\"First_Ten_Year_Saving\") + col(\"Second_Ten_Year_Saving\") )\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"First_Ten_Year_kWh_Contribution\", (col(\"B\") - col(\"A\")) * 120 )\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"Second_Ten_Year_kWh_Contribution\", col(\"First_Ten_Year_kWh_Contribution\") )\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"Total_20_Year_kWh_Contribution\", col(\"First_Ten_Year_kWh_Contribution\") + col(\"Second_Ten_Year_kWh_Contribution\") )\n\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"First_Ten_Year_Saving\",round(col(\"First_Ten_Year_Saving\"), 2)) #Round to 2 decimal places\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"Second_Ten_Year_Saving\",round(col(\"Second_Ten_Year_Saving\"), 2))\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"Total_20_Year_Saving\",round(col(\"Total_20_Year_Saving\"), 2))\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"First_Ten_Year_kWh_Contribution\",round(col(\"First_Ten_Year_kWh_Contribution\"), 2))\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"Second_Ten_Year_kWh_Contribution\",round(col(\"Second_Ten_Year_kWh_Contribution\"), 2))\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.withColumn(\"Total_20_Year_kWh_Contribution\",round(col(\"Total_20_Year_kWh_Contribution\"), 2))\n\n#finalize the datafram by droping unwanted columns\ndf_Elec_10yr_Saving = df_Elec_10yr_Saving.drop('A', 'B', 'D')\n",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:44:59+0000",
+      "progress": 100,
+      "config": {
+        "tableHide": true,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "+--------+----------------+------------------+-----------+------------+\n|Bill_Val|Unit_Consumption|Monthly_Production|Installment|Init_Payment|\n+--------+----------------+------------------+-----------+------------+\n|  5900.0|           225.0|             228.0|    5264.75|         0.0|\n| 11200.0|           350.0|             364.8|    6479.69|         0.0|\n| 13100.0|           390.0|             410.4|    7087.16|         0.0|\n| 16100.0|           450.0|             456.0|    9314.55|         0.0|\n| 22300.0|           590.0|             592.8|   10225.76|         0.0|\n| 26400.0|           680.0|             684.0|   11845.68|         0.0|\n| 32200.0|           810.0|             820.8|   14680.55|         0.0|\n| 36700.0|           910.0|             912.0|   15186.77|     30000.0|\n| 42600.0|          1040.0|            1048.8|   15186.77|    150000.0|\n| 48900.0|          1180.0|            1185.6|   15186.77|    250000.0|\n| 57000.0|          1360.0|            1368.0|   15186.77|    500000.0|\n+--------+----------------+------------------+-----------+------------+\n\nFactors for Unit Bill Value:\n+---------------+-----------------------+-------------------------+------------------+-------------------+\n|Bill_Val_Factor|Unit_Consumption_Factor|Monthly_Production_Factor|Installment_Factor|Init_Payment_Factor|\n+---------------+-----------------------+-------------------------+------------------+-------------------+\n|            1.0|   0.025560179257362356|     0.025836107495804908|0.4021933971996039|  2.976952624839949|\n+---------------+-----------------------+-------------------------+------------------+-------------------+\n\n"
+          }
+        ]
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=81",
+              "$$hashKey": "object:12352"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=82",
+              "$$hashKey": "object:12353"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=83",
+              "$$hashKey": "object:12354"
+            }
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680541_152885273",
+      "id": "paragraph_1630077607935_2052829313",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T07:44:59+0000",
+      "dateFinished": "2021-09-05T07:45:04+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11891"
+    },
+    {
+      "title": "Export Overall Electricity Findings to CSV",
+      "text": "%pyspark\n\n#Exporting overal final electricity related findings to a csv\ndf_Elec_10yr_Saving.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Findings/Elec\") #Write the data as a single CSV than in parts and overide each time perform",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:45:04+0000",
+      "progress": 0,
+      "config": {
+        "tableHide": false,
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": false
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680545_970052747",
+      "id": "paragraph_1630080753383_1961997143",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11892"
+    },
+    {
+      "title": "Telco Payment Analysis",
+      "text": "%pyspark\n\n#Since less than 3000 avg bill value is more pre paid and over 7,000 is corporate ommitted the same and got the customers related to the study from the all customer database\ndf_Telco_Final_Working = df_Telco_Final.where(df_Telco_Final.Monthly_Avg_Overall_Telco > 3000)\ndf_Telco_Final_Wokring = df_Telco_Final_Working.where(df_Telco_Final.Monthly_Avg_Overall_Telco < 7000)\n\n#Find the saving of the eac person if moved to 3000 package\n\ndf_Telco_Saving = df_Telco_Final_Wokring.withColumn(\"Annual_Saving_From_Package_Change\", (col(\"Monthly_Avg_Overall_Telco\") - 3000) * 12) #Find the Saving and add to new column\n\ndf_Telco_Saving = df_Telco_Saving.na.fill(0) #Replace \"Null\" value with 0",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:45:04+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680545_2076753693",
+      "id": "paragraph_1630108703265_576845608",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T07:45:05+0000",
+      "dateFinished": "2021-09-05T07:45:06+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11893"
+    },
+    {
+      "title": "Export Overall Telco Findings to CSV",
+      "text": "%pyspark\n\ndf_Telco_Saving.coalesce(1).write.option(\"header\", \"true\").mode(\"overwrite\").csv(\"/data/Findings/Telco\")",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T07:45:06+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": false
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680546_394504950",
+      "id": "paragraph_1630109595893_196205330",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11894"
+    },
+    {
+      "title": "Electricity ML Part",
+      "text": "%pyspark\n\n#imports\nfrom pyspark.ml.regression import LinearRegression\nfrom pyspark.ml.linalg import Vectors\nfrom pyspark.ml.feature import VectorAssembler\n\ndf_ML_Dataset = df_Elec_10yr_Saving.drop('Total_Paid_Overall_Elec', 'First_Ten_Year_kWh_Contribution', 'Second_Ten_Year_kWh_Contribution', 'Total_20_Year_kWh_Contribution', 'First_Ten_Year_Saving', 'Second_Ten_Year_Saving') #Drop unwanted columns for the ML work\n\n\nfeatureassembler = VectorAssembler(inputCols=[\"Monthly_Avg_Overall_Elec\",\"Installment\"], outputCol=\"features\") #Create the Vector Col\n\noutput = featureassembler.transform(df_ML_Dataset) #Apply the vector to the data frame\n\nfinalized_data = output.select(\"features\",\"Total_20_Year_Saving\") #take the final data frame to the model\n\ntrain, test = finalized_data.randomSplit([0.8, 0.2], seed = 13) #Ramdonly split training and testing data with a seed to have identical selection\n\n\nlr = LinearRegression(featuresCol = 'features', labelCol = 'Total_20_Year_Saving', maxIter=10) #Set up the regression mode\nlrModel = lr.fit(train) #Apply the model to training dataset",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T10:16:52+0000",
+      "progress": 99,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=84",
+              "$$hashKey": "object:12852"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=85",
+              "$$hashKey": "object:12853"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=86",
+              "$$hashKey": "object:12854"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=87",
+              "$$hashKey": "object:12855"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=88",
+              "$$hashKey": "object:12856"
+            }
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680546_1250139018",
+      "id": "paragraph_1630236671952_823508544",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T07:46:26+0000",
+      "dateFinished": "2021-09-05T08:31:52+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11895"
+    },
+    {
+      "title": "Fit the Model to Testing dataset",
+      "text": "%pyspark\npred_results = lrModel.evaluate(test) #Apply the model to testing dataset",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T08:32:39+0000",
+      "progress": 99,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=89",
+              "$$hashKey": "object:12421"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=90",
+              "$$hashKey": "object:12422"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=91",
+              "$$hashKey": "object:12423"
+            }
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680569_2147313463",
+      "id": "paragraph_1630243784456_14991835",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T08:32:40+0000",
+      "dateFinished": "2021-09-05T08:53:14+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11896"
+    },
+    {
+      "title": "Evaluate Predictions",
+      "text": "%pyspark\npred_results.predictions.createOrReplaceTempView(\"final\") #Register the DataFrame as a SQL temporary view\n#pred_results.predictions.printSchema() #Show predicted results from the model",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T08:53:53+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "title": true,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680577_38799170",
+      "id": "paragraph_1630243782191_141720868",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T08:53:53+0000",
+      "dateFinished": "2021-09-05T08:54:01+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11897"
+    },
+    {
+      "text": "%sql\n\nSelect * from final",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T08:54:02+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "sql",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/sql",
+        "fontSize": 9,
+        "results": {
+          "0": {
+            "graph": {
+              "mode": "table",
+              "height": 300,
+              "optionOpen": false,
+              "setting": {
+                "table": {
+                  "tableGridState": {},
+                  "tableColumnTypeState": {
+                    "names": {
+                      "features": "string",
+                      "Total_20_Year_Saving": "string",
+                      "prediction": "string"
+                    },
+                    "updated": false
+                  },
+                  "tableOptionSpecHash": "[{\"name\":\"useFilter\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable filter for columns\"},{\"name\":\"showPagination\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable pagination for better navigation\"},{\"name\":\"showAggregationFooter\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable a footer for displaying aggregated values\"}]",
+                  "tableOptionValue": {
+                    "useFilter": false,
+                    "showPagination": false,
+                    "showAggregationFooter": false
+                  },
+                  "updated": false,
+                  "initialized": false
+                }
+              },
+              "commonSetting": {}
+            }
+          }
+        },
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TABLE",
+            "data": "features\tTotal_20_Year_Saving\tprediction\n[232.26,93.41344045198468]\t44114.83\t44114.8328187912\n[2483.87,998.9961350877086]\t471779.51\t471779.51160919305\n[2484.52,999.2575608015371]\t471902.97\t471902.97084112663\n[190177.42,76488.10427315114]\t3.612178185E7\t3.612178185294728E7\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[1129.03,454.08842105185687]\t214444.89\t214444.88731262836\n[4553.55,1831.407783389886]\t864888.9\t864888.9010678112\n[3826.45,1538.9729579673503]\t726785.5\t726785.5048542123\n[5225.81,2101.78632243342]\t992576.14\t992576.1368518216\n[967.74,389.21864661587733]\t183809.9\t183809.90343793252\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[8234.19,3311.7369208444325]\t1563979.65\t1563979.6509503862\n[8580.65,3451.0808482490415]\t1629785.32\t1629785.3209437341\n[11980.65,4818.538428274651]\t2275572.07\t2275572.0725958264\n[71.61,28.801069795774666]\t13601.41\t13601.408803229866\n[68000.0,27349.15160051218]\t1.291573503E7\t1.2915735033231594E7\n[203.23,81.73776587900133]\t38600.95\t38600.95358336173\n[2077.42,835.524625263765]\t394579.5\t394579.5041947835\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[1935.48,778.4372932317547]\t367619.81\t367619.80668610765\n[1574.19,633.1288376177981]\t298997.37\t298997.366831877\n[3835.48,1542.6047644225362]\t728500.64\t728500.6384916883\n[7354.84,2958.0681493751617]\t1396958.3\t1396958.3038723664\n[2870.97,1154.685202507683]\t545304.23\t545304.2326575827\n[7924.52,3187.1896888425117]\t1505161.77\t1505161.7734844736\n[38838.71,15620.673055269535]\t7376918.93\t7376918.932324349\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[1580.65,635.7270070198467]\t300224.36\t300224.36166001594\n[20232.26,8137.281558249684]\t3842860.43\t3842860.4307722724\n[25806.45,10379.184019427023]\t4901606.92\t4901606.917005088\n[4516.13,1816.3577061414865]\t857781.45\t857781.4480540402\n[516.13,207.58408258194635]\t98032.33\t98032.32846334395\n[6451.61,2594.794999373241]\t1225401.25\t1225401.2545503904\n[7741.94,3113.757216795136]\t1470483.02\t1470483.024920756\n[19483.87,7836.284035215754]\t3700713.27\t3700713.269869652\n[141.94,57.08733203201027]\t26959.7\t26959.69769843328\n[38387.1,15439.038491235604]\t7291141.36\t7291141.357349761\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[748.39,300.99752303393103]\t142147.16\t142147.1610923777\n[5903.23,2374.2401794513457]\t1121243.45\t1121243.4490001039\n[6451.61,2594.794999373241]\t1225401.25\t1225401.2545503904\n[72303.23,29079.88233053971]\t1.373307883E7\t1.3733078834205661E7\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[61748.39,24834.795282316914]\t1.172832123E7\t1.1728321234850494E7\n[45.81,18.424479923815632]\t8701.03\t8701.026981869874\n[2634.19,1059.4538478610762]\t500330.88\t500330.88352341147\n[14000.0,5630.70768245839]\t2659121.92\t2659121.918757194\n[16258.06,6538.884524562103]\t3088011.69\t3088011.693002936\n[14158.06,5694.278372193345]\t2689143.41\t2689143.4052178203\n[306.45,123.25216923495526]\t58206.28\t58206.27961439964\n[1354.84,544.9077140358518]\t257334.62\t257334.62448632214\n[2709.68,1089.8154280717035]\t514669.25\t514669.2487828869\n[14212.9,5716.334658572347]\t2699559.57\t2699559.565647409\n[13587.1,5464.642025166457]\t2580696.82\t2580696.8158874447\n[770.32,309.81762442509626]\t146312.49\t146312.4856405337\n[774.19,311.3741129058901]\t147047.54\t147047.5429137377\n[2580.65,1037.9204129097318]\t490161.64\t490161.64155769\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[1677.42,674.647262907811]\t318604.59\t318604.59223571385\n[2584.52,1039.4769013905257]\t490896.7\t490896.69883089396\n[5161.29,2075.8368038854046]\t980321.38\t980321.3835528237\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[8104.52,3259.584501902691]\t1539350.48\t1539350.483866055\n[10129.03,4073.829074060822]\t1923880.41\t1923880.4063916951\n[6709.68,2698.589051631244]\t1274418.37\t1274418.368373583\n[42035.48,16906.392869416144]\t7984104.73\t7984104.730582837\n[1032.26,415.1681651638927]\t196064.66\t196064.65673693045\n[1190.32,478.7388548988479]\t226086.14\t226086.14319755678\n[4645.16,1868.2527213034582]\t882289.06\t882289.0552792371\n[43894.19,17653.953774877733]\t8337143.05\t8337143.052101443\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[7664.52,3082.6194033111415]\t1455778.08\t1455778.0807110784\n[1612.9,648.6977443597956]\t306349.84\t306349.83893671597\n[33847.1,13613.080428495527]\t6428826.11\t6428826.106614321\n[15233.55,6126.833358293858]\t2893419.05\t2893419.0503749703\n[4838.71,1946.0972550134454]\t919051.42\t919051.4158034319\n[5645.16,2270.4461271933433]\t1072226.33\t1072226.3351769112\n[8225.81,3308.366540103075]\t1562387.98\t1562387.9765448435\n[2709.68,1089.8154280717035]\t514669.25\t514669.2487828869\n[5387.1,2166.6560968694]\t1023211.12\t1023211.1207265174\n[8096.77,3256.4675030070443]\t1537878.47\t1537878.4699468478\n[90741.94,36495.809905655595]\t1.723527726E7\t1.7235277256427705E7\n[2051.61,825.1440134577471]\t389677.22\t389677.22300062457\n[26290.32,10573.793342734962]\t4993511.87\t4993511.868629175\n[1277.42,513.769900551857]\t242629.68\t242629.6802766442\n[18709.68,7524.909922309864]\t3553665.73\t3553665.727145672\n[2419.35,973.0466165396932]\t459524.76\t459524.7583101952\n[967.74,389.21864661587733]\t183809.9\t183809.90343793252\n[2903.23,1167.6599617816908]\t551431.61\t551431.6093070817\n[1290.32,518.9581954878364]\t245079.87\t245079.8711873242\n[2161.29,869.2565862157495]\t410509.54\t410509.5438598014\n[6935.48,2789.4043226811796]\t1317306.21\t1317306.206174478\n[1630.32,655.7039534903973]\t309658.55\t309658.5463525334\n[2064.52,830.3363303277854]\t392129.31\t392129.3132841035\n[978.71,393.63070827848935]\t185893.52\t185893.51539841\n[3362.58,1352.4075027772094]\t638679.3\t638679.2988280782\n[12364.52,4972.928410993601]\t2348483.3\t2348483.296230146\n[25806.45,10379.184019427023]\t4901606.92\t4901606.917005088\n[1032.26,415.1681651638927]\t196064.66\t196064.65673693045\n[1277.42,513.769900551857]\t242629.68\t242629.6802766442\n[3225.81,1297.39951065365]\t612701.58\t612701.5770564734\n[4526.45,1820.50834209027]\t859741.6\t859741.6007825842\n[69548.39,27971.903848258018]\t1.320983202E7\t1.3209832018052353E7\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[1935.48,778.4372932317547]\t367619.81\t367619.80668610765\n[1245.16,500.79514127784927]\t236502.3\t236502.30362714527\n[17193.55,6915.132433838032]\t3265696.12\t3265696.1189744114\n[161.29,64.86977443597955]\t30634.98\t30634.984064453274\n[693.55,278.94123665492975]\t131731.0\t131731.00066278924\n[4580.65,1842.3072246895015]\t870036.2\t870036.201353038\n[2903.23,1167.6599617816908]\t551431.61\t551431.6093070817\n[20193.55,8121.712651507687]\t3835507.96\t3835507.9586674334\n[2387.1,960.0758791997445]\t453399.28\t453399.28103349515\n[6664.52,2680.4259974212564]\t1265840.8\t1265840.8008134041\n[15935.48,6409.144975690145]\t3026741.73\t3026741.7252535443\n[1387.1,557.8824733098595]\t263462.0\t263462.0011358211\n[1670.97,672.0531154398211]\t317379.5\t317379.49678037385\n[9825.81,3951.875989526891]\t1866287.62\t1866287.6243811222\n[967.74,389.21864661587733]\t183809.9\t183809.90343793252\n[1058.06,425.5447550358517]\t200965.04\t200965.03855829043\n[2903.23,1167.6599617816908]\t551431.61\t551431.6093070817\n[2638.71,1061.2717620556984]\t501189.4\t501189.40002854896\n[4463.23,1795.0816749699113]\t847733.77\t847733.7659474532\n[23190.32,9326.993784476317]\t4404706.3\t4404706.300946385\n[27516.13,11066.806041608841]\t5226338.89\t5226338.885700543\n[1451.61,583.8279699238159]\t275714.85\t275714.85506202\n[1935.48,778.4372932317547]\t367619.81\t367619.80668610765\n[6622.58,2663.5580059782346]\t1257874.83\t1257874.8312944956\n[9419.35,3788.4004577688884]\t1789085.72\t1789085.7175939137\n[16463.87,6621.659949428301]\t3127102.68\t3127102.6845786762\n[17741.94,7135.6912756939855]\t3369855.82\t3369855.8238974963\n[967.74,389.21864661587733]\t183809.9\t183809.90343793252\n[938.06,377.2815463290655]\t178172.56\t178172.56497056954\n[22774.19,9159.629042483359]\t4325667.7\t4325667.700662566\n[1290.32,518.9581954878364]\t245079.87\t245079.8711873242\n[16800.65,6757.110644663897]\t3191069.76\t3191069.7617026153\n[20425.16,8214.864666245843]\t3879499.33\t3879499.3320645336\n[42645.16,17151.60214511909]\t8099905.69\t8099905.6913908515\n[3293.55,1324.6440919686308]\t625567.93\t625567.9283967419\n[32.26,12.97475927400769]\t6127.38\t6127.376839256391\n[2580.65,1037.9204129097318]\t490161.64\t490161.64155769\n[11561.29,4649.874601580669]\t2195919.97\t2195919.974897938\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[5225.81,2101.78632243342]\t992576.14\t992576.1368518216\n[21519.35,8654.940669036496]\t4087326.8\t4087326.8043557694\n[967.74,389.21864661587733]\t183809.9\t183809.90343793252\n[4516.13,1816.3577061414865]\t857781.45\t857781.4480540402\n[2580.65,1037.9204129097318]\t490161.64\t490161.64155769\n[2929.03,1178.03655165365]\t556331.99\t556331.9911284416\n[3870.97,1556.878608397568]\t735241.51\t735241.5125552567\n[7441.29,2992.8377693143425]\t1413378.38\t1413378.3817195203\n[1648.39,662.9715883348276]\t313090.71\t313090.7130002844\n[4516.13,1816.3577061414865]\t857781.45\t857781.4480540402\n[15806.45,6357.249960528173]\t3002234.12\t3002234.118028348\n[9677.42,3892.194510026891]\t1838102.83\t1838102.8314171063\n[6414.84,2580.00634783867]\t1218417.26\t1218417.260768553\n[34838.71,14011.899431709995]\t6617169.81\t6617169.812733653\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[483.87,194.60932330793867]\t91904.95\t91904.95181384498\n[9096.77,3658.6609088969294]\t1727815.75\t1727815.749844522\n[451.61,181.63456403393099]\t85777.57\t85777.57516434601\n[954.84,384.0303516798978]\t181359.71\t181359.71252725253\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[642.58,258.44143875672233]\t122049.9\t122049.89750640483\n[1847.74,743.1488437989761]\t350954.71\t350954.7097478857\n[1096.77,441.1136617778492]\t208317.51\t208317.5106631294\n[7419.35,2984.0136459891182]\t1409211.16\t1409211.1577985655\n[8516.13,3425.131329701026]\t1617530.57\t1617530.5676447363\n[60967.74,24520.823000008975]\t1.15800467E7\t1.1580046697298376E7\n[67965.81,27335.400607964802]\t1.290924108E7\t1.290924107763189E7\n[13657.42,5492.924265468633]\t2594053.21\t2594053.205409849\n[17627.1,7089.503384961591]\t3348043.43\t3348043.426674048\n[587.1,236.1277485979515]\t111512.18\t111512.17721768188\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[3230.97,1299.4748286280417]\t613681.65\t613681.6534207454\n[246.45,99.12056488156216]\t46810.04\t46810.042820539195\n[2397.42,964.2265151485282]\t455359.43\t455359.4337620392\n[29225.81,11754.428063790661]\t5551070.85\t5551070.854395999\n[3303.23,1328.5373241376449]\t627406.52\t627406.5212661513\n[31721.29,12758.093664320751]\t6025055.54\t6025055.537635047\n[1290.32,518.9581954878364]\t245079.87\t245079.8711873242\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[2903.23,1167.6599617816908]\t551431.61\t551431.6093070817\n[87664.52,35258.091874501944]\t1.665076047E7\t1.6650760472525002E7\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[3872.9,1557.6548416709356]\t735608.09\t735608.0915054593\n[1354.84,544.9077140358518]\t257334.62\t257334.62448632214\n[129.03,51.89501516197186]\t24507.61\t24507.607414954313\n[6451.61,2594.794999373241]\t1225401.25\t1225401.2545503904\n[13437.42,5404.441716172859]\t2552267.0\t2552267.003832361\n[30322.58,12195.54172556851]\t5759388.36\t5759388.364869371\n[3777.42,1519.2534152765695]\t717472.88\t717472.8800208294\n[5935.48,2387.2109167912945]\t1127368.93\t1127368.9262768037\n[7096.77,2854.2740971171593]\t1347941.19\t1347941.1900491738\n[5645.16,2270.4461271933433]\t1072226.33\t1072226.3351769112\n[7096.77,2854.2740971171593]\t1347941.19\t1347941.1900491738\n[7290.32,2932.1186308271463]\t1384703.55\t1384703.5505733686\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[2490.32,1001.5902825556985]\t473004.61\t473004.60706453316\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[11363.87,4570.473579389888]\t2158422.56\t2158422.557100539\n[17725.81,7129.203896056983]\t3366792.14\t3366792.135572748\n[3548.39,1427.139059525609]\t673971.54\t673971.544805865\n[3748.39,1507.577740703586]\t711959.0\t711959.0007853999\n[6949.68,2795.115469044816]\t1320003.32\t1320003.3155490248\n[13185.81,5303.245833316904]\t2504476.88\t2504476.884837307\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[4645.16,1868.2527213034582]\t882289.06\t882289.0552792371\n[8225.81,3308.366540103075]\t1562387.98\t1562387.9765448435\n[9032.26,3632.715412282973]\t1715562.9\t1715562.895918323\n[14258.06,5734.497712782333]\t2708137.13\t2708137.133207588\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[1122.58,451.4942735838671]\t213219.79\t213219.79185728836\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[1612.9,648.6977443597956]\t306349.84\t306349.83893671597\n[4000.0,1608.77362355954]\t759749.12\t759749.1197804536\n[4330.97,1741.8875751069154]\t822612.66\t822612.661308187\n[1264.52,508.5816056158774]\t240179.49\t240179.48936596423\n[1612.9,648.6977443597956]\t306349.84\t306349.83893671597\n[3258.71,1310.6316737074271]\t618950.51\t618950.5135651069\n[3193.55,1284.4247513796424]\t606574.2\t606574.2004069745\n[6494.19,2611.920394596032]\t1233488.78\t1233488.7839284332\n[13548.39,5449.073118424459]\t2573344.34\t2573344.3437826056\n[32274.19,12980.466398437267]\t6130071.86\t6130071.859690471\n[1935.48,778.4372932317547]\t367619.81\t367619.80668610765\n[11096.77,4463.047720676699]\t2107690.31\t2107690.3096398697\n[1412.9,568.2590631818185]\t268362.38\t268362.38295718114\n[3258.71,1310.6316737074271]\t618950.51\t618950.5135651069\n[967.74,389.21864661587733]\t183809.9\t183809.90343793252\n[5735.48,2306.7722356133177]\t1089381.47\t1089381.470297269\n[50167.74,20177.13421639822]\t9528724.07\t9528724.074403496\n[4149.68,1668.9739325531382]\t788178.93\t788178.9318355375\n[5967.74,2400.1856760653022]\t1133496.3\t1133496.302926303\n[358.71,144.27079662676064]\t68132.4\t68132.40186185208\n[2707.1,1088.7777690845076]\t514179.21\t514179.21060075087\n[3601.94,1448.6765164110125]\t684142.69\t684142.6861443855\n[967.74,389.21864661587733]\t183809.9\t183809.90343793252\n[2741.94,1102.7901873457113]\t520796.63\t520796.62543238583\n[31612.9,12714.499921056346]\t6004468.24\t6004468.235866938\n[6758.06,2718.0471686081964]\t1283607.53\t1283607.5339750326\n[23245.16,9349.050070855319]\t4415122.46\t4415122.461375974\n[23540.0,9467.632774647893]\t4471123.57\t4471123.568981005\n[23550.32,9471.783410596676]\t4473083.72\t4473083.721709548\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[696.77,280.2362994218952]\t132342.6\t132342.59870405975\n[2090.32,840.7129201997445]\t397029.69\t397029.6951054635\n[6613.55,2659.926199523049]\t1256159.7\t1256159.6976570198\n[841.94,338.6227161549298]\t159915.79\t159915.7936268051\n[37922.58,15252.211610331637]\t7202911.69\t7202911.692091694\n[193.55,77.84453370998725]\t36762.36\t36762.36071395224\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[5161.29,2075.8368038854046]\t980321.38\t980321.3835528237\n[1290.32,518.9581954878364]\t245079.87\t245079.8711873242\n[3225.81,1297.39951065365]\t612701.58\t612701.5770564734\n[4983.87,2004.479649812421]\t946622.71\t946622.7113533783\n[24761.29,9958.82755932715]\t4703092.07\t4703092.069547234\n[5070.97,2039.5106954654302]\t963166.25\t963166.2484324657\n[23381.29,9403.800659199109]\t4440978.62\t4440978.623288445\n[649.03,261.03558622471206]\t123274.99\t123274.99296174482\n[11222.58,4513.647673071706]\t2131586.32\t2131586.318823796\n[1116.13,448.9001261158774]\t211994.7\t211994.69640194837\n[967.74,389.21864661587733]\t183809.9\t183809.90343793252\n[2670.97,1074.246521329706]\t507316.78\t507316.77667804784\n[3870.97,1556.878608397568]\t735241.51\t735241.5125552567\n[1448.39,582.5329071568506]\t275103.26\t275103.2570207496\n[1612.9,648.6977443597956]\t306349.84\t306349.83893671597\n[3064.52,1232.5297362176705]\t582066.59\t582066.5931817775\n[3225.81,1297.39951065365]\t612701.58\t612701.5770564734\n[2612.9,1050.8911502496805]\t496287.12\t496287.11883439\n[3161.29,1271.4499921056345]\t600446.82\t600446.8237574755\n[31.61,12.713333560179265]\t6003.92\t6003.917607322903\n[8430.97,3390.8805392554436]\t1601355.51\t1601355.5088886505\n[4025.81,1619.154235365558]\t764651.4\t764651.4009746127\n[18000.0,7239.48130601793]\t3418871.04\t3418871.0383478906\n[548.39,220.55884185595403]\t104159.7\t104159.7051128429\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[3225.81,1297.39951065365]\t612701.58\t612701.5770564734\n[3796.77,1527.0358576805386]\t721148.17\t721148.1663868494\n[20872.26,8394.68533801921]\t3964420.29\t3964420.2899067835\n[57738.71,23222.128426588362]\t1.096673352E7\t1.096673352239039E7\n[838.71,337.3236314539055]\t159302.3\t159302.29621273561\n[1935.48,778.4372932317547]\t367619.81\t367619.80668610765\n[2658.06,1069.0542044596677]\t504864.69\t504864.686394569\n[8905.16,3581.5966303943683]\t1691421.87\t1691421.8676433284\n[9126.45,3670.5980091837414]\t1733453.09\t1733453.088311885\n[232.26,93.41344045198468]\t44114.83\t44114.8328187912\n[93677.42,37676.44060477723]\t1.779283434E7\t1.779283434282173E7\n[2103.23,845.9052370697829]\t399481.79\t399481.78538894246\n[3277.42,1318.156712331627]\t622504.24\t622504.2400719924\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[1935.48,778.4372932317547]\t367619.81\t367619.80668610765\n[3225.81,1297.39951065365]\t612701.58\t612701.5770564734\n[10645.16,4281.413156642769]\t2021912.73\t2021912.7346652816\n[160720.0,64640.52419462232]\t3.052671963E7\t3.0526719625343934E7\n[645.16,259.4790977439182]\t122539.94\t122539.93568854082\n[1935.48,778.4372932317547]\t367619.81\t367619.80668610765\n[7522.58,3025.5320712791313]\t1428818.38\t1428818.3832024024\n[1290.32,518.9581954878364]\t245079.87\t245079.8711873242\n[2548.39,1024.945653635724]\t484034.26\t484034.26490819105\n[948.39,381.43620421190803]\t180134.62\t180134.6170719125\n[709.68,285.42861629193357]\t134794.69\t134794.6889875387\n[2516.77,1012.2282981414859]\t478028.45\t478028.4481178266\n[8387.1,3373.2363145390545]\t1593022.96\t1593022.9604195396\n[24915.48,10020.841760581312]\t4732378.5\t4732378.498734657\n[151596.77,60971.22124820554]\t2.879387814E7\t2.8793878135263074E7\n[284159.35,114287.01679195589]\t5.3972454E7\t5.397245399668088E7\n[124751.61,50174.274916146634]\t2.369498147E7\t2.369498146644523E7\n[322.58,129.7395488719591]\t61269.97\t61269.96793914912\n[3096.77,1245.5004735576192]\t588192.07\t588192.0704584776\n[21191.61,8523.125802190147]\t4025076.76\t4025076.760242106\n[5716.13,2298.9897932093486]\t1085706.18\t1085706.1839312492\n[7354.84,2958.0681493751617]\t1396958.3\t1396958.3038723664\n[22392.26,9006.019314971836]\t4253124.96\t4253124.955351247\n[5814.84,2338.690304304739]\t1104454.89\t1104454.8928299486\n[1935.48,778.4372932317547]\t367619.81\t367619.80668610765\n[11341.94,4561.653477998722]\t2154257.23\t2154257.2325523826\n[967.74,389.21864661587733]\t183809.9\t183809.90343793252\n[1425.81,573.4513800518569]\t270814.47\t270814.47324066004\n[7160.0,2879.7047861715764]\t1359950.92\t1359950.9242571036\n[3940.0,1584.6420192061469]\t748352.88\t748352.8829865933\n"
+          }
+        ]
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=92",
+              "$$hashKey": "object:12472"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=93",
+              "$$hashKey": "object:12473"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=94",
+              "$$hashKey": "object:12474"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=95",
+              "$$hashKey": "object:12475"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=96",
+              "$$hashKey": "object:12476"
+            }
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680577_1007518298",
+      "id": "paragraph_1630266551477_1358511422",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T08:54:03+0000",
+      "dateFinished": "2021-09-05T09:02:39+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11898"
+    },
+    {
+      "title": "Show Findings and Related Data of the ML model",
+      "text": "%pyspark\n\n# Print the coefficients and intercept for linear regression\nprint(\"Coefficients: %s\" % str(lrModel.coefficients))\nprint(\"Intercept: %s\" % str(lrModel.intercept))\n\n# Summarize the model over the training set and print out some metrics\ntrainingSummary = lrModel.summary\nprint(\"numIterations: %d\" % trainingSummary.totalIterations)\nprint(\"objectiveHistory: %s\" % str(trainingSummary.objectiveHistory))\ntrainingSummary.residuals.show()\nprint(\"RMSE: %f\" % trainingSummary.rootMeanSquaredError)\nprint(\"r2: %f\" % trainingSummary.r2)",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T10:16:44+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "editorHide": true,
+        "title": true,
+        "results": {
+          "0": {
+            "graph": {
+              "mode": "table",
+              "height": 374,
+              "optionOpen": false
+            }
+          }
+        },
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "Coefficients: [94.968639948837,236.12679511418486]\nIntercept: 0.00018975742565798703\nnumIterations: 3\nobjectiveHistory: [0.49999999999999994, 0.08578643762690474, -2.220446049250313e-16]\n+--------------------+\n|           residuals|\n+--------------------+\n|-0.00420531876443...|\n|0.001392294580000...|\n|-0.00343793252250...|\n|8.106834720820189E-4|\n|0.003853021189570427|\n|-0.00430338084697...|\n|-0.00123814705875...|\n|0.004311459182645194|\n|-0.00118732420378...|\n|-0.00275990867521...|\n|-1.31438486278057...|\n|-0.00443549931515...|\n|-0.00443549931515...|\n|-0.00511284290405456|\n|0.001551755121909082|\n|-4.91738319396972...|\n|-1.10309571027755...|\n|-7.70080834627151...|\n|0.002060850878478959|\n|-0.00123814705875...|\n+--------------------+\nonly showing top 20 rows\n\nRMSE: 0.002967\nr2: 1.000000\n"
+          }
+        ]
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=97",
+              "$$hashKey": "object:12825"
+            },
+            {
+              "jobUrl": "http://85119166228e:4040/jobs/job?id=98",
+              "$$hashKey": "object:12826"
+            }
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630827680604_833891764",
+      "id": "paragraph_1630239898847_1428773309",
+      "dateCreated": "2021-09-05T07:41:20+0000",
+      "dateStarted": "2021-09-05T09:37:51+0000",
+      "dateFinished": "2021-09-05T09:53:39+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:11899"
+    },
+    {
+      "text": "%pyspark\n",
+      "user": "anonymous",
+      "dateUpdated": "2021-09-05T09:37:51+0000",
+      "progress": 0,
+      "config": {
+        "colWidth": 12,
+        "fontSize": 9,
+        "enabled": true,
+        "results": {},
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/python"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1630834671799_1722203259",
+      "id": "paragraph_1630834671799_1722203259",
+      "dateCreated": "2021-09-05T09:37:51+0000",
+      "status": "READY",
+      "$$hashKey": "object:11900"
+    }
+  ],
+  "name": "Project(NoteBook)",
+  "id": "2GGG9MU3V",
+  "defaultInterpreterGroup": "spark",
+  "version": "0.10.0",
+  "noteParams": {},
+  "noteForms": {},
+  "angularObjects": {},
+  "config": {
+    "isZeppelinNotebookCronEnable": false,
+    "looknfeel": "default",
+    "personalizedMode": "false"
+  },
+  "info": {
+    "isRunning": false
+  },
+  "path": "/Project(NoteBook)"
+}
